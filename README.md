@@ -47,7 +47,7 @@ const MySchema = zod.object({
     age: zod.number().min(18, "Must be at least 18"),
 });
 
-export const myAction = zodAction({
+export const action = zodAction({
     body: MySchema,
 }, async ({parsedBody}) => {
     // parsedBody is already validated against MySchema
@@ -75,7 +75,7 @@ const FileSchema = zx.file({
     }
 });
 
-export const uploadAction = zodAction({
+export const action = zodAction({
     body: zod.object({
         avatar: FileSchema,
     }),
@@ -122,7 +122,7 @@ const QuerySchema = zod.object({
     search: zod.string().optional(),
 });
 
-export const myLoader = zodLoader({
+export const loader = zodLoader({
     params: ParamsSchema,
     query: QuerySchema,
 }, async ({
@@ -155,7 +155,7 @@ Here's how to use these parse methods in your actions or loaders:
 #### Parsing JSON Body
 
 ```typescript
-export const myAction = async ({request}) => {
+export const action = async ({request}) => {
     const parsedBody = await parseJson(request, MySchema);
     // Use parsedBody here
 };
@@ -164,7 +164,7 @@ export const myAction = async ({request}) => {
 #### Parsing Form Data
 
 ```typescript
-export const myAction = async ({request}) => {
+export const action = async ({request}) => {
     const parsedBody = await parseForm(request, MySchema);
     // Use parsedBody here
 };
@@ -175,7 +175,7 @@ export const myAction = async ({request}) => {
 In loaders, you might want to validate URL and query parameters:
 
 ```typescript
-export const myLoader = async ({
+export const loader = async ({
                                    request,
                                    params
                                }) => {
@@ -188,7 +188,7 @@ export const myLoader = async ({
 #### Parsing Headers
 
 ```typescript
-export const myLoader = async ({request}) => {
+export const loader = async ({request}) => {
     const parsedHeaders = await parseHeaders(request.headers, HeadersSchema);
     // Use parsedHeaders here
 };
