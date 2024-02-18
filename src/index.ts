@@ -33,13 +33,13 @@ export const zx = Object.assign({
         }
 
         if (minimumSize) {
-            if (val.size < minimumSize.value) {
+            if (val.size < convertToBytes(minimumSize)) {
                 return false;
             }
         }
 
         if (maximumSize) {
-            if (val.size > maximumSize.value) {
+            if (val.size > convertToBytes(maximumSize)) {
                 return false;
             }
         }
@@ -128,6 +128,31 @@ async function parseOrThrow<Output>(schema: ZodSchema<Output>, value: any) {
         return await schema.parseAsync(value);
     } catch (error) {
         throwBadRequest();
+    }
+}
+
+export function convertToBytes(fileSize: {
+    value: number;
+    unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
+}): number {
+    const {
+        value,
+        unit
+    } = fileSize;
+
+    switch (unit) {
+        case 'B':
+            return value;
+        case 'KB':
+            return value * 1024;
+        case 'MB':
+            return value * 1024 * 1024;
+        case 'GB':
+            return value * 1024 * 1024 * 1024;
+        case 'TB':
+            return value * 1024 * 1024 * 1024 * 1024;
+        default:
+            throw new Error('Invalid file size unit.');
     }
 }
 
