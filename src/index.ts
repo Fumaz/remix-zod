@@ -3,6 +3,7 @@ import {json, Params} from "@remix-run/react";
 import {ActionFunctionArgs, Cookie, LoaderFunctionArgs} from "@remix-run/node";
 
 const base64Regex = /^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/;
+let debug = false;
 
 export const zx = Object.assign({
     file: ({
@@ -168,7 +169,8 @@ export const zx = Object.assign({
     parseHeadersSafe: parseHeadersSafe,
     parseHeadersWithDefault: parseHeadersWithDefault,
     cookie: createZodCookie,
-    throwBadRequest: throwBadRequest
+    throwBadRequest: throwBadRequest,
+    debug: (value: boolean) => debug = value
 }, zod);
 
 export let badRequestMessage = "Bad Request";
@@ -199,6 +201,10 @@ async function parseOrThrow<Schema extends ZodType>(schema: Schema, value: any):
     try {
         return await schema.parseAsync(value);
     } catch (error) {
+        if (debug) {
+            console.error(error);
+        }
+
         throwBadRequest();
     }
 }
