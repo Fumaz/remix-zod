@@ -1,6 +1,6 @@
 import {z as zod, ZodType, ZodUnknown} from "zod";
 import {json, Params} from "@remix-run/react";
-import {ActionFunction, ActionFunctionArgs, Cookie, LoaderFunction, LoaderFunctionArgs} from "@remix-run/node";
+import {ActionFunctionArgs, Cookie, LoaderFunctionArgs} from "@remix-run/node";
 
 const base64Regex = /^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/;
 
@@ -433,18 +433,20 @@ export type ZodActionFunctionArgs<Params = unknown, Body = unknown> = ActionFunc
     parsedBody: Body;
 };
 
-export type ZodLoaderFunction<Params = unknown, Query = unknown> = (args: ZodLoaderFunctionArgs<Params, Query>) => ReturnType<LoaderFunction>;
+type DataFunctionValue = Response | NonNullable<unknown> | null;
 
-export type ZodActionFunction<Params = unknown, Body = unknown> = (args: ZodActionFunctionArgs<Params, Body>) => ReturnType<ActionFunction>;
+export type ZodLoaderFunction<Params = unknown, Query = unknown, Return extends DataFunctionValue = DataFunctionValue> = (args: ZodLoaderFunctionArgs<Params, Query>) => Promise<Return>;
 
-export function zodLoader<Params extends ZodType = ZodUnknown, Query extends ZodType = ZodUnknown>({
-                                                                                                       params = zod.unknown() as unknown as Params,
-                                                                                                       query = zod.unknown() as unknown as Query,
-                                                                                                   }: {
+export type ZodActionFunction<Params = unknown, Body = unknown, Return extends DataFunctionValue = DataFunctionValue> = (args: ZodActionFunctionArgs<Params, Body>) => Promise<Return>;
+
+export function zodLoader<Params extends ZodType = ZodUnknown, Query extends ZodType = ZodUnknown, Return extends DataFunctionValue = DataFunctionValue>({
+                                                                                                                                                             params = zod.unknown() as unknown as Params,
+                                                                                                                                                             query = zod.unknown() as unknown as Query,
+                                                                                                                                                         }: {
     params?: Params;
     query?: Query;
-}, loader: ZodLoaderFunction<Params, Query>) {
-    return async (args: LoaderFunctionArgs) => {
+}, loader: ZodLoaderFunction<zod.infer<Params>, zod.infer<Query>, Return>) {
+    return async (args: LoaderFunctionArgs): Promise<Return> => {
         return loader({
             ...args,
             parsedParams: await parseParams(args.params, params),
@@ -453,14 +455,14 @@ export function zodLoader<Params extends ZodType = ZodUnknown, Query extends Zod
     }
 }
 
-export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodType = ZodUnknown>({
-                                                                                                      params = zod.unknown() as unknown as Params,
-                                                                                                      body = zod.unknown() as unknown as Body
-                                                                                                  }: {
+export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodType = ZodUnknown, Return extends DataFunctionValue = DataFunctionValue>({
+                                                                                                                                                            params = zod.unknown() as unknown as Params,
+                                                                                                                                                            body = zod.unknown() as unknown as Body
+                                                                                                                                                        }: {
     params?: Params;
     body?: Body;
-}, action: ZodActionFunction<zod.infer<Params>, zod.infer<Body>>) {
-    return async (args: ActionFunctionArgs) => {
+}, action: ZodActionFunction<zod.infer<Params>, zod.infer<Body>, Return>) {
+    return async (args: ActionFunctionArgs): Promise<Return> => {
         return action({
             ...args,
             parsedParams: await parseParams(args.params, params),
