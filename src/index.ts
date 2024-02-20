@@ -1,4 +1,4 @@
-import {z as zod, ZodSchema} from "zod";
+import {z as zod, ZodType, ZodUnknown} from "zod";
 import {json, Params} from "@remix-run/react";
 import {ActionFunction, ActionFunctionArgs, Cookie, LoaderFunction, LoaderFunctionArgs} from "@remix-run/node";
 
@@ -49,8 +49,6 @@ export const zx = Object.assign({
         return true;
     })),
     files: ({
-                minimumFiles,
-                maximumFiles,
                 minimumSize,
                 maximumSize,
                 mimetype
@@ -70,7 +68,7 @@ export const zx = Object.assign({
         minimumSize,
         maximumSize,
         mimetype
-    })).min(minimumFiles ?? 0).max(maximumFiles ?? Infinity),
+    })),
     base64: zod.string().refine(val => {
         try {
             atob(val);
@@ -93,9 +91,19 @@ export const zx = Object.assign({
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
         };
         mimetype?: string | string[];
-    }) => zod.string().refine(val => base64Regex.test(val), {
-        message: 'Value must be a base64 encoded file'
-    }).transform(val => {
+    }) => zod.preprocess<ReturnType<typeof zx.file>>((val) => {
+        if (val instanceof File) {
+            return val;
+        }
+
+        if (typeof val !== 'string') {
+            throw new Error('Value must be a string');
+        }
+
+        if (!base64Regex.test(val)) {
+            throw new Error('Value must be a valid base64 string');
+        }
+
         const byteString = atob(val.split(',')[1]);
         const mimeString = val.split(',')[0].split(':')[1].split(';')[0];
         const ab = new ArrayBuffer(byteString.length);
@@ -109,40 +117,16 @@ export const zx = Object.assign({
         const blob = new Blob([ab], {type: mimeString});
 
         return new File([blob], `file.${extension}`, {type: mimeString});
-    }).refine(val => {
-        if (mimetype) {
-            if (Array.isArray(mimetype)) {
-                if (!mimetype.includes(val.type)) {
-                    return false;
-                }
-            } else if (val.type !== mimetype) {
-                return false;
-            }
-        }
-
-        if (minimumSize) {
-            if (val.size < convertToBytes(minimumSize)) {
-                return false;
-            }
-        }
-
-        if (maximumSize) {
-            if (val.size > convertToBytes(maximumSize)) {
-                return false;
-            }
-        }
-
-        return true;
-    }),
+    }, zx.file({
+        minimumSize,
+        maximumSize,
+        mimetype
+    })),
     base64Files: ({
-                      minimumFiles,
-                      maximumFiles,
                       minimumSize,
                       maximumSize,
                       mimetype
                   }: {
-        minimumFiles?: number;
-        maximumFiles?: number;
         minimumSize?: {
             value: number;
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
@@ -156,7 +140,7 @@ export const zx = Object.assign({
         minimumSize,
         maximumSize,
         mimetype
-    })).min(minimumFiles ?? 0).max(maximumFiles ?? Infinity),
+    })),
     stringNumber: zod.string().refine(val => !isNaN(Number(val)), {
         message: 'Value must be a number'
     }).transform(val => Number(val)),
@@ -211,7 +195,7 @@ async function getBodyEncoding(request: Request) {
     return 'text';
 }
 
-async function parseOrThrow<Output>(schema: ZodSchema<Output>, value: any) {
+async function parseOrThrow<Schema extends ZodType>(schema: Schema, value: any): Promise<zod.infer<Schema>> {
     try {
         return await schema.parseAsync(value);
     } catch (error) {
@@ -244,19 +228,19 @@ export function convertToBytes(fileSize: {
     }
 }
 
-export async function parseJson<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseJson<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const body = await request.json();
 
     return await parseOrThrow(schema, body);
 }
 
-export async function parseJsonSafe<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseJsonSafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const body = await request.json();
 
     return await schema.safeParseAsync(body);
 }
 
-export async function parseJsonWithDefault<Output>(request: Request, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseJsonWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     const body = await request.json();
 
     return await schema.safeParseAsync(body).then(result => result.success ? result.data : defaultValue);
@@ -281,28 +265,28 @@ export function formToObject(form: FormData) {
     return data;
 }
 
-export async function parseForm<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseForm<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const body = await request.formData();
     const data = formToObject(body);
 
     return await parseOrThrow(schema, data);
 }
 
-export async function parseFormSafe<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseFormSafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const body = await request.formData();
     const data = formToObject(body);
 
     return await schema.safeParseAsync(data);
 }
 
-export async function parseFormWithDefault<Output>(request: Request, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseFormWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     const body = await request.formData();
     const data = formToObject(body);
 
     return await schema.safeParseAsync(data).then(result => result.success ? result.data : defaultValue);
 }
 
-export async function parseBody<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseBody<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const encoding = await getBodyEncoding(request);
 
     if (encoding === 'json') {
@@ -316,7 +300,7 @@ export async function parseBody<Output>(request: Request, schema: ZodSchema<Outp
     return throwBadRequest();
 }
 
-export async function parseBodySafe<Output>(request: Request, schema: ZodSchema<Output>) {
+export async function parseBodySafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
     const encoding = await getBodyEncoding(request);
 
     if (encoding === 'json') {
@@ -330,7 +314,7 @@ export async function parseBodySafe<Output>(request: Request, schema: ZodSchema<
     return throwBadRequest();
 }
 
-export async function parseBodyWithDefault<Output>(request: Request, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseBodyWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     const encoding = await getBodyEncoding(request);
 
     if (encoding === 'json') {
@@ -344,15 +328,15 @@ export async function parseBodyWithDefault<Output>(request: Request, schema: Zod
     return throwBadRequest();
 }
 
-export async function parseParams<Output>(params: Params<any>, schema: ZodSchema<Output>) {
+export async function parseParams<Schema extends ZodType>(params: Params<any>, schema: Schema): Promise<zod.infer<Schema>> {
     return await parseOrThrow(schema, params);
 }
 
-export async function parseParamsSafe<Output>(params: Params<any>, schema: ZodSchema<Output>) {
+export async function parseParamsSafe<Schema extends ZodType>(params: Params<any>, schema: Schema): Promise<zod.infer<Schema>> {
     return await schema.safeParseAsync(params);
 }
 
-export async function parseParamsWithDefault<Output>(params: Params<any>, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseParamsWithDefault<Schema extends ZodType>(params: Params<any>, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     return await schema.safeParseAsync(params).then(result => result.success ? result.data : defaultValue);
 }
 
@@ -375,7 +359,7 @@ function searchParamsToObject(search: URLSearchParams) {
     return data;
 }
 
-export async function parseQuery<Output>(request: Request | URLSearchParams, schema: ZodSchema<Output>) {
+export async function parseQuery<Schema extends ZodType>(request: Request | URLSearchParams, schema: Schema): Promise<zod.infer<Schema>> {
     if (request instanceof URLSearchParams) {
         return await parseOrThrow(schema, request);
     }
@@ -386,7 +370,7 @@ export async function parseQuery<Output>(request: Request | URLSearchParams, sch
     return await parseOrThrow(schema, data);
 }
 
-export async function parseQuerySafe<Output>(request: Request | URLSearchParams, schema: ZodSchema<Output>) {
+export async function parseQuerySafe<Schema extends ZodType>(request: Request | URLSearchParams, schema: Schema): Promise<zod.infer<Schema>> {
     if (request instanceof URLSearchParams) {
         return await schema.safeParseAsync(request);
     }
@@ -397,7 +381,7 @@ export async function parseQuerySafe<Output>(request: Request | URLSearchParams,
     return await schema.safeParseAsync(data);
 }
 
-export async function parseQueryWithDefault<Output>(request: Request | URLSearchParams, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseQueryWithDefault<Schema extends ZodType>(request: Request | URLSearchParams, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     if (request instanceof URLSearchParams) {
         return await schema.safeParseAsync(request).then(result => result.success ? result.data : defaultValue);
     }
@@ -427,15 +411,15 @@ function headersToObject(headers: Headers) {
     return data;
 }
 
-export async function parseHeaders<Output>(headers: Headers, schema: ZodSchema<Output>) {
+export async function parseHeaders<Schema extends ZodType>(headers: Headers, schema: Schema): Promise<zod.infer<Schema>> {
     return await parseOrThrow(schema, headersToObject(headers));
 }
 
-export async function parseHeadersSafe<Output>(headers: Headers, schema: ZodSchema<Output>) {
+export async function parseHeadersSafe<Schema extends ZodType>(headers: Headers, schema: Schema): Promise<zod.infer<Schema>> {
     return await schema.safeParseAsync(headersToObject(headers));
 }
 
-export async function parseHeadersWithDefault<Output>(headers: Headers, schema: ZodSchema<Output>, defaultValue: Output) {
+export async function parseHeadersWithDefault<Schema extends ZodType>(headers: Headers, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
     return await schema.safeParseAsync(headersToObject(headers)).then(result => result.success ? result.data : defaultValue);
 }
 
@@ -453,41 +437,41 @@ export type ZodLoaderFunction<Params = unknown, Query = unknown> = (args: ZodLoa
 
 export type ZodActionFunction<Params = unknown, Body = unknown> = (args: ZodActionFunctionArgs<Params, Body>) => ReturnType<ActionFunction>;
 
-export function zodLoader<Params = unknown, Query = unknown>({
-                                                                 params = undefined,
-                                                                 query = undefined,
-                                                             }: {
-    params?: ZodSchema<Params>;
-    query?: ZodSchema<Query>;
+export function zodLoader<Params extends ZodType = ZodUnknown, Query extends ZodType = ZodUnknown>({
+                                                                                                       params = zod.unknown() as unknown as Params,
+                                                                                                       query = zod.unknown() as unknown as Query,
+                                                                                                   }: {
+    params?: Params;
+    query?: Query;
 }, loader: ZodLoaderFunction<Params, Query>) {
     return async (args: LoaderFunctionArgs) => {
         return loader({
             ...args,
-            parsedParams: (await parseParams(args.params, params ?? zod.unknown())) as Params,
-            parsedQuery: (await parseQuery(args.request, query ?? zod.unknown())) as Query
+            parsedParams: await parseParams(args.params, params),
+            parsedQuery: await parseQuery(args.request, query),
         });
     }
 }
 
-export function zodAction<Params = unknown, Body = unknown>({
-                                                                params = undefined,
-                                                                body = undefined
-                                                            }: {
-    params?: ZodSchema<Params>;
-    body?: ZodSchema<Body>;
-}, action: ZodActionFunction<Params, Body>) {
+export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodType = ZodUnknown>({
+                                                                                                      params = zod.unknown() as unknown as Params,
+                                                                                                      body = zod.unknown() as unknown as Body
+                                                                                                  }: {
+    params?: Params;
+    body?: Body;
+}, action: ZodActionFunction<zod.infer<Params>, zod.infer<Body>>) {
     return async (args: ActionFunctionArgs) => {
         return action({
             ...args,
-            parsedParams: (await parseParams(args.params, params ?? zod.unknown())) as Params,
-            parsedBody: (await parseBody(args.request, body ?? zod.unknown())) as Body
+            parsedParams: await parseParams(args.params, params),
+            parsedBody: await parseBody(args.request, body)
         });
     }
 }
 
-export function createZodCookie<Output>(cookie: Cookie, schema: ZodSchema<Output>) {
+export function createZodCookie<Schema extends ZodType>(cookie: Cookie, schema: Schema) {
     return Object.assign(cookie, {
-        async parse(cookieHeader: string | null | Request | Headers) {
+        async parse(cookieHeader: string | null | Request | Headers): Promise<zod.infer<Schema>> {
             if (cookieHeader instanceof Request) {
                 const headers = cookieHeader.headers.get('cookie');
 
@@ -514,7 +498,7 @@ export function createZodCookie<Output>(cookie: Cookie, schema: ZodSchema<Output
 
             return await schema.parseAsync(cookie.parse(cookieHeader));
         },
-        async parseSafe(cookieHeader: string | null | Request | Headers) {
+        async parseSafe(cookieHeader: string | null | Request | Headers): Promise<zod.infer<Schema>> {
             if (cookieHeader instanceof Request) {
                 const headers = cookieHeader.headers.get('cookie');
 
@@ -541,7 +525,7 @@ export function createZodCookie<Output>(cookie: Cookie, schema: ZodSchema<Output
 
             return await schema.safeParseAsync(cookie.parse(cookieHeader));
         },
-        async parseWithDefault(cookieHeader: string | null | Request | Headers, defaultValue: Output) {
+        async parseWithDefault(cookieHeader: string | null | Request | Headers, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
             if (cookieHeader instanceof Request) {
                 const headers = cookieHeader.headers.get('cookie');
 
@@ -571,7 +555,7 @@ export function createZodCookie<Output>(cookie: Cookie, schema: ZodSchema<Output
         async serialize(value: any) {
             return await cookie.serialize(await schema.parseAsync(value));
         },
-        async serializeWithDefault(value: any, defaultValue: Output) {
+        async serializeWithDefault(value: any, defaultValue: zod.infer<Schema>) {
             return await cookie.serialize(await schema.safeParseAsync(value).then(result => result.success ? result.data : defaultValue));
         }
     });
