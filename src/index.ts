@@ -19,7 +19,7 @@ export const zx = Object.assign({
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
         };
         mimetype?: string | string[];
-    }) => zod.custom<File>((val => {
+    } = {}) => zod.custom<File>((val => {
         if (!(val instanceof File)) {
             return false;
         }
@@ -64,7 +64,7 @@ export const zx = Object.assign({
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
         };
         mimetype?: string | string[];
-    }) => zod.array(zx.file({
+    } = {}) => zod.array(zx.file({
         minimumSize,
         maximumSize,
         mimetype
@@ -91,7 +91,7 @@ export const zx = Object.assign({
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
         };
         mimetype?: string | string[];
-    }) => zod.preprocess<ReturnType<typeof zx.file>>((val) => {
+    } = {}) => zod.preprocess<ReturnType<typeof zx.file>>((val) => {
         if (val instanceof File) {
             return val;
         }
@@ -136,7 +136,7 @@ export const zx = Object.assign({
             unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
         };
         mimetype?: string | string[];
-    }) => zod.array(zx.base64File({
+    } = {}) => zod.array(zx.base64File({
         minimumSize,
         maximumSize,
         mimetype
