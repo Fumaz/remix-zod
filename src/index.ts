@@ -2,6 +2,8 @@ import {z as zod, ZodSchema} from "zod";
 import {json, Params} from "@remix-run/react";
 import {ActionFunction, ActionFunctionArgs, Cookie, LoaderFunction, LoaderFunctionArgs} from "@remix-run/node";
 
+const base64Regex = /^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/;
+
 export const zx = Object.assign({
     file: ({
                minimumSize,
@@ -65,6 +67,92 @@ export const zx = Object.assign({
         };
         mimetype?: string | string[];
     }) => zod.array(zx.file({
+        minimumSize,
+        maximumSize,
+        mimetype
+    })).min(minimumFiles ?? 0).max(maximumFiles ?? Infinity),
+    base64: zod.string().refine(val => {
+        try {
+            atob(val);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }),
+    base64File: ({
+                     minimumSize,
+                     maximumSize,
+                     mimetype
+                 }: {
+        minimumSize?: {
+            value: number;
+            unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
+        };
+        maximumSize?: {
+            value: number;
+            unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
+        };
+        mimetype?: string | string[];
+    }) => zod.string().refine(val => base64Regex.test(val), {
+        message: 'Value must be a base64 encoded file'
+    }).transform(val => {
+        const byteString = atob(val.split(',')[1]);
+        const mimeString = val.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+
+        const extension = mimeString.split('/')[1];
+        const blob = new Blob([ab], {type: mimeString});
+
+        return new File([blob], `file.${extension}`, {type: mimeString});
+    }).refine(val => {
+        if (mimetype) {
+            if (Array.isArray(mimetype)) {
+                if (!mimetype.includes(val.type)) {
+                    return false;
+                }
+            } else if (val.type !== mimetype) {
+                return false;
+            }
+        }
+
+        if (minimumSize) {
+            if (val.size < convertToBytes(minimumSize)) {
+                return false;
+            }
+        }
+
+        if (maximumSize) {
+            if (val.size > convertToBytes(maximumSize)) {
+                return false;
+            }
+        }
+
+        return true;
+    }),
+    base64Files: ({
+                      minimumFiles,
+                      maximumFiles,
+                      minimumSize,
+                      maximumSize,
+                      mimetype
+                  }: {
+        minimumFiles?: number;
+        maximumFiles?: number;
+        minimumSize?: {
+            value: number;
+            unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
+        };
+        maximumSize?: {
+            value: number;
+            unit: 'B' | 'KB' | 'MB' | 'GB' | 'TB';
+        };
+        mimetype?: string | string[];
+    }) => zod.array(zx.base64File({
         minimumSize,
         maximumSize,
         mimetype
@@ -366,33 +454,33 @@ export type ZodLoaderFunction<Params = unknown, Query = unknown> = (args: ZodLoa
 export type ZodActionFunction<Params = unknown, Body = unknown> = (args: ZodActionFunctionArgs<Params, Body>) => ReturnType<ActionFunction>;
 
 export function zodLoader<Params = unknown, Query = unknown>({
-                                                                 params,
-                                                                 query,
+                                                                 params = undefined,
+                                                                 query = undefined,
                                                              }: {
-    params: ZodSchema<Params>;
-    query: ZodSchema<Query>;
+    params?: ZodSchema<Params>;
+    query?: ZodSchema<Query>;
 }, loader: ZodLoaderFunction<Params, Query>) {
     return async (args: LoaderFunctionArgs) => {
         return loader({
             ...args,
-            parsedParams: await parseParams(args.params, params),
-            parsedQuery: await parseQuery(args.request, query)
+            parsedParams: (await parseParams(args.params, params ?? zod.unknown())) as Params,
+            parsedQuery: (await parseQuery(args.request, query ?? zod.unknown())) as Query
         });
     }
 }
 
 export function zodAction<Params = unknown, Body = unknown>({
-                                                                params,
-                                                                body
+                                                                params = undefined,
+                                                                body = undefined
                                                             }: {
-    params: ZodSchema<Params>;
-    body: ZodSchema<Body>;
+    params?: ZodSchema<Params>;
+    body?: ZodSchema<Body>;
 }, action: ZodActionFunction<Params, Body>) {
     return async (args: ActionFunctionArgs) => {
         return action({
             ...args,
-            parsedParams: await parseParams(args.params, params),
-            parsedBody: await parseBody(args.request, body)
+            parsedParams: (await parseParams(args.params, params ?? zod.unknown())) as Params,
+            parsedBody: (await parseBody(args.request, body ?? zod.unknown())) as Body
         });
     }
 }
