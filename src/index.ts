@@ -71,6 +71,10 @@ export const zx = Object.assign({
         mimetype
     })),
     base64: zod.string().refine(val => {
+        if (val.startsWith('data:')) {
+            val = val.split(',')[1];
+        }
+
         try {
             atob(val);
             return true;
@@ -99,10 +103,6 @@ export const zx = Object.assign({
 
         if (typeof val !== 'string') {
             throw new Error('Value must be a string');
-        }
-
-        if (!base64Regex.test(val)) {
-            throw new Error('Value must be a valid base64 string');
         }
 
         const byteString = atob(val.split(',')[1]);
