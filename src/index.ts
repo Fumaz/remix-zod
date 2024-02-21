@@ -170,11 +170,25 @@ export const zx = Object.assign({
     parseHeadersWithDefault: parseHeadersWithDefault,
     cookie: createZodCookie,
     throwBadRequest: throwBadRequest,
-    debug: (value: boolean) => debug = value
+    debug: (value: boolean) => debug = value,
+    setBadRequestMessage: setBadRequestMessage,
+    setCustomBadRequestJson: setCustomBadRequestJson,
 }, zod);
 
 export let badRequestMessage = "Bad Request";
-export let customBadRequestJson: (message: string) => any = (message) => message;
+export let customBadRequestJson: (message: string) => any = (message) => {
+    return {
+        error: message
+    };
+};
+
+export function setBadRequestMessage(message: string) {
+    badRequestMessage = message;
+}
+
+export function setCustomBadRequestJson(json: (message: string) => any) {
+    customBadRequestJson = json;
+}
 
 function throwBadRequest(): never {
     throw json(customBadRequestJson(badRequestMessage), {
