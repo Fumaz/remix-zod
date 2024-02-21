@@ -148,6 +148,9 @@ export const zx = Object.assign({
     stringBoolean: zod.string().refine(val => val === 'true' || val === 'false', {
         message: 'Value must be a boolean'
     }).transform(val => val === 'true'),
+    stringDate: zod.string().refine(val => !isNaN(Date.parse(val)), {
+        message: 'Value must be a date'
+    }).transform(val => new Date(val)),
     action: zodAction,
     loader: zodLoader,
     parseJson: parseJson,
