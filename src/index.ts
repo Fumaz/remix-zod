@@ -184,6 +184,9 @@ export let customBadRequestJson: (message: string) => any = (message) => {
         error: message
     };
 };
+export let onError: <Return>(error: any) => Promise<Return> = (error) => {
+    throw error;
+}
 
 export function setBadRequestMessage(message: string) {
     badRequestMessage = message;
@@ -191,6 +194,10 @@ export function setBadRequestMessage(message: string) {
 
 export function setCustomBadRequestJson(json: (message: string) => any) {
     customBadRequestJson = json;
+}
+
+export function setOnError(handler: <Return>(error: any) => Promise<Return>) {
+    onError = handler;
 }
 
 function throwBadRequest(): never {
@@ -470,11 +477,15 @@ export function zodLoader<Params extends ZodType = ZodUnknown, Query extends Zod
     query?: Query;
 }, loader: ZodLoaderFunction<zod.infer<Params>, zod.infer<Query>, Return>) {
     return async (args: LoaderFunctionArgs): Promise<Return> => {
-        return loader({
-            ...args,
-            parsedParams: await parseParams(args.params, params),
-            parsedQuery: await parseQuery(args.request, query),
-        });
+        try {
+            return loader({
+                ...args,
+                parsedParams: await parseParams(args.params, params),
+                parsedQuery: await parseQuery(args.request, query),
+            });
+        } catch (error) {
+            return await onError(error);
+        }
     }
 }
 
@@ -486,11 +497,15 @@ export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodT
     body?: Body;
 }, action: ZodActionFunction<zod.infer<Params>, zod.infer<Body>, Return>) {
     return async (args: ActionFunctionArgs): Promise<Return> => {
-        return action({
-            ...args,
-            parsedParams: await parseParams(args.params, params),
-            parsedBody: await parseBody(args.request, body)
-        });
+        try {
+            return action({
+                ...args,
+                parsedParams: await parseParams(args.params, params),
+                parsedBody: await parseBody(args.request, body)
+            });
+        } catch (error) {
+            return await onError(error);
+        }
     }
 }
 
