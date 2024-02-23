@@ -2,7 +2,6 @@ import {z as zod, ZodType, ZodUnknown} from "zod";
 import {json, Params} from "@remix-run/react";
 import {ActionFunctionArgs, Cookie, LoaderFunctionArgs} from "@remix-run/node";
 
-const base64Regex = /^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/;
 let debug = false;
 
 export const zx = Object.assign({
@@ -184,7 +183,7 @@ export let customBadRequestJson: (message: string) => any = (message) => {
         error: message
     };
 };
-export let onError: <Return>(error: any) => Promise<Return> = (error) => {
+export let onError: <Return>(error: any) => Promise<Return> = async (error) => {
     console.error(error);
 
     return json({error: 'Internal Server Error'}) as any;
