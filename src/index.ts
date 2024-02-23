@@ -480,7 +480,7 @@ export function zodLoader<Params extends ZodType = ZodUnknown, Query extends Zod
 }, loader: ZodLoaderFunction<zod.infer<Params>, zod.infer<Query>, Return>) {
     return async (args: LoaderFunctionArgs): Promise<Return> => {
         try {
-            return loader({
+            return await loader({
                 ...args,
                 parsedParams: await parseParams(args.params, params),
                 parsedQuery: await parseQuery(args.request, query),
@@ -500,7 +500,7 @@ export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodT
 }, action: ZodActionFunction<zod.infer<Params>, zod.infer<Body>, Return>) {
     return async (args: ActionFunctionArgs): Promise<Return> => {
         try {
-            return action({
+            return await action({
                 ...args,
                 parsedParams: await parseParams(args.params, params),
                 parsedBody: await parseBody(args.request, body)
