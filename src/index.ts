@@ -1,4 +1,4 @@
-import {z as zod, ZodType, ZodUnknown} from "zod";
+import {z as zod, ZodError, ZodType, ZodUnknown} from "zod";
 import {json, Params} from "@remix-run/react";
 import {ActionFunctionArgs, Cookie, LoaderFunctionArgs} from "@remix-run/node";
 import {isResponse} from "@remix-run/react/dist/data.js";
@@ -178,7 +178,14 @@ export const zx = Object.assign({
     setCustomBadRequestJson: setCustomBadRequestJson,
 }, zod);
 
-export let badRequestMessage = "Bad Request";
+export let badRequestMessage = (error: any) => {
+    if (error instanceof ZodError) {
+        return `Bad Request: ${error.issues.map(issue => issue.message).join(', ')}`;
+    }
+
+    return 'Bad Request';
+};
+
 export let customBadRequestJson: (message: string) => any = (message) => {
     return {
         error: message
@@ -190,7 +197,7 @@ export let onError: <Return>(error: any) => Promise<Return> = async (error) => {
     return json({error: 'Internal Server Error'}) as any;
 }
 
-export function setBadRequestMessage(message: string) {
+export function setBadRequestMessage(message: (error: any) => string) {
     badRequestMessage = message;
 }
 
@@ -202,10 +209,10 @@ export function setOnError(handler: <Return>(error: any) => Promise<Return>) {
     onError = handler;
 }
 
-function throwBadRequest(): never {
-    throw json(customBadRequestJson(badRequestMessage), {
+function throwBadRequest(error: any): never {
+    throw json(customBadRequestJson(badRequestMessage(error)), {
         status: 400,
-        statusText: badRequestMessage
+        statusText: badRequestMessage(error)
     });
 }
 
@@ -231,7 +238,7 @@ async function parseOrThrow<Schema extends ZodType>(schema: Schema, value: any):
             console.error(error);
         }
 
-        throwBadRequest();
+        throwBadRequest(error);
     }
 }
 
@@ -329,7 +336,7 @@ export async function parseBody<Schema extends ZodType>(request: Request, schema
         return await parseForm(request, schema);
     }
 
-    return throwBadRequest();
+    return throwBadRequest({});
 }
 
 export async function parseBodySafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
@@ -343,7 +350,7 @@ export async function parseBodySafe<Schema extends ZodType>(request: Request, sc
         return await parseFormSafe(request, schema);
     }
 
-    return throwBadRequest();
+    return throwBadRequest({});
 }
 
 export async function parseBodyWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
@@ -357,7 +364,7 @@ export async function parseBodyWithDefault<Schema extends ZodType>(request: Requ
         return await parseFormWithDefault(request, schema, defaultValue);
     }
 
-    return throwBadRequest();
+    return throwBadRequest({});
 }
 
 export async function parseParams<Schema extends ZodType>(params: Params<any>, schema: Schema): Promise<zod.infer<Schema>> {
