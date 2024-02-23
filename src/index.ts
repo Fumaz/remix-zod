@@ -1,6 +1,7 @@
 import {z as zod, ZodType, ZodUnknown} from "zod";
 import {json, Params} from "@remix-run/react";
 import {ActionFunctionArgs, Cookie, LoaderFunctionArgs} from "@remix-run/node";
+import {isResponse} from "@remix-run/react/dist/data.js";
 
 let debug = false;
 
@@ -485,6 +486,14 @@ export function zodLoader<Params extends ZodType = ZodUnknown, Query extends Zod
                 parsedQuery: await parseQuery(args.request, query),
             });
         } catch (error) {
+            if (error instanceof Response) {
+                return error as any;
+            }
+
+            if (isResponse(error)) {
+                return error as any;
+            }
+
             return await onError(error);
         }
     }
@@ -505,6 +514,14 @@ export function zodAction<Params extends ZodType = ZodUnknown, Body extends ZodT
                 parsedBody: await parseBody(args.request, body)
             });
         } catch (error) {
+            if (error instanceof Response) {
+                return error as any;
+            }
+
+            if (isResponse(error)) {
+                return error as any;
+            }
+
             return await onError(error);
         }
     }
