@@ -185,7 +185,9 @@ export let customBadRequestJson: (message: string) => any = (message) => {
     };
 };
 export let onError: <Return>(error: any) => Promise<Return> = (error) => {
-    throw error;
+    console.error(error);
+
+    throw json({error: 'Internal Server Error'});
 }
 
 export function setBadRequestMessage(message: string) {
