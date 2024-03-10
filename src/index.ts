@@ -268,19 +268,19 @@ export function convertToBytes(fileSize: {
 }
 
 export async function parseJson<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
-    const body = await request.json();
+    const body = await request.clone().json();
 
     return await parseOrThrow(schema, body);
 }
 
 export async function parseJsonSafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
-    const body = await request.json();
+    const body = await request.clone().json();
 
     return await schema.safeParseAsync(body);
 }
 
 export async function parseJsonWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
-    const body = await request.json();
+    const body = await request.clone().json();
 
     return await schema.safeParseAsync(body).then(result => result.success ? result.data : defaultValue);
 }
@@ -305,21 +305,21 @@ export function formToObject(form: FormData) {
 }
 
 export async function parseForm<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
-    const body = await request.formData();
+    const body = await request.clone().formData();
     const data = formToObject(body);
 
     return await parseOrThrow(schema, data);
 }
 
 export async function parseFormSafe<Schema extends ZodType>(request: Request, schema: Schema): Promise<zod.infer<Schema>> {
-    const body = await request.formData();
+    const body = await request.clone().formData();
     const data = formToObject(body);
 
     return await schema.safeParseAsync(data);
 }
 
 export async function parseFormWithDefault<Schema extends ZodType>(request: Request, schema: Schema, defaultValue: zod.infer<Schema>): Promise<zod.infer<Schema>> {
-    const body = await request.formData();
+    const body = await request.clone().formData();
     const data = formToObject(body);
 
     return await schema.safeParseAsync(data).then(result => result.success ? result.data : defaultValue);
